@@ -1,0 +1,37 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: k8sapi-svc
+  name: k8sapi-svc
+spec:
+  type: LoadBalancer
+  selector:
+    app: k8sapi
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: k8sapi
+  name: k8sapi
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: k8sapi
+  template:
+    metadata:
+      labels:
+        app: k8sapi
+    spec:
+      containers:
+      - image: k8sapi:1.0
+        name: k8sapi
+      serviceAccountName: k8sapi
