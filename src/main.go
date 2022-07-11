@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/cors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -128,7 +129,16 @@ func handleRequests() {
 	router.HandleFunc("/pods", getPods)
 	router.HandleFunc("/pods/{ns}", getPods)
 	router.HandleFunc("/deletePod/{ns}/{pname}", deletePod)
-	http.ListenAndServe(":8080", router)
+	// Access-Control-Allow-Origin: *
+
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowCredentials: true,
+	})
+
+	handler := c.Handler(router)
+	log.Fatal(http.ListenAndServe(":8080", handler))
+
 }
 
 func main() {
