@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -88,6 +89,20 @@ func getNamespaces(w http.ResponseWriter, r *http.Request) {
 }
 
 func reader(conn *websocket.Conn) {
+	wsTimer := 10
+	websocketloop, ok := os.LookupEnv("WEBSOCKETLOOP")
+
+	if ok {
+		var err error
+		wsTimer, err = strconv.Atoi(websocketloop)
+
+		if err != nil {
+			// ... handle error
+			panic(err)
+		}
+	}
+	fmt.Println("Websocket loop time set to ", wsTimer)
+
 	log.Println("Opened Websocket to send pod data")
 	for {
 		// get pods in all the namespaces by omitting namespace
@@ -202,6 +217,7 @@ func main() {
 	flag.BoolVar(&localMode, "l", false, "Turn on local running mode")
 	flag.Parse()
 	log.SetOutput(os.Stdout)
+
 	connectKubeAPI()
 
 	fmt.Println("******* Program start: *********")
