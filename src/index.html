@@ -21,6 +21,13 @@
 
         socket.onmessage = (msg) => {
             console.log("Message : ",msg)
+            jsonObj = JSON.parse(msg.data);
+            console.log("JSON : ",jsonObj)
+            for (var i = 0; i < jsonObj.length; i++){
+                // document.write("<br><br>array index: " + i);
+                var obj = jsonObj[i];
+                console.log("DATA : ",obj)
+            }
         }
 
         socket.onerror = (error) => {
