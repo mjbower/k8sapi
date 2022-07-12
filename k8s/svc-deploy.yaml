@@ -32,6 +32,6 @@ spec:
         app: k8sapi
     spec:
       containers:
-      - image: k8sapi:1.1
+      - image: k8sapi:1.2
         name: k8sapi
       serviceAccountName: k8sapi

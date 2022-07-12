@@ -9,8 +9,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.com/rs/cors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,6 +25,11 @@ import (
 var cs *kubernetes.Clientset
 
 var localMode bool
+
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+}
 
 func check(e error) {
 	if e != nil {
@@ -80,6 +87,52 @@ func getNamespaces(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonResp)
 }
 
+func reader(conn *websocket.Conn) {
+	log.Println("Opened Websocket to send pod data")
+	for {
+		// get pods in all the namespaces by omitting namespace
+		// Or specify namespace to get pods in particular namespace
+		pods, err := cs.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			panic(err.Error())
+		}
+		fmt.Printf("There are %d pods in the cluster\n", len(pods.Items))
+
+		jsonResp, err := json.Marshal(pods.Items)
+		if err != nil {
+			log.Fatalf("Error happened in JSON marshal. Err: %s", err)
+		}
+		// 	messageType, p, err := conn.ReadMessage()
+		// 	if err != nil {
+		// 		log.Println(err)
+		// 		return
+		// 	}
+		// 	log.Println("Received MSG :", string(p))
+		messageType := 1
+		if err := conn.WriteMessage(messageType, jsonResp); err != nil {
+			log.Println(err)
+			return
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+}
+
+/*
+Returns a json object listing Pods,  specify "ns" to limit the list to a Namespace
+*/
+func wsGetPods(w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("Error happened.  Err: %s/n", err)
+	}
+
+	fmt.Fprintf(w, "websocket opened for namespace %v\n", ws)
+	reader(ws)
+}
+
 /*
 Returns a json object listing Pods,  specify "ns" to limit the list to a Namespace
 */
@@ -129,6 +182,8 @@ func handleRequests() {
 	router.HandleFunc("/pods", getPods)
 	router.HandleFunc("/pods/{ns}", getPods)
 	router.HandleFunc("/deletePod/{ns}/{pname}", deletePod)
+	router.HandleFunc("/ws/pods", wsGetPods)
+
 	// Access-Control-Allow-Origin: *
 
 	c := cors.New(cors.Options{
