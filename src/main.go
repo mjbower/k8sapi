@@ -146,7 +146,7 @@ func reader(conn *websocket.Conn) {
 			return
 		}
 
-		time.Sleep(15 * time.Second)
+		time.Sleep(5 * time.Second)
 	}
 }
 
