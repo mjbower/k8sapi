@@ -113,10 +113,27 @@ func reader(conn *websocket.Conn) {
 		}
 		fmt.Printf("There are %d pods in the cluster\n", len(pods.Items))
 
-		jsonResp, err := json.Marshal(pods.Items)
+		type Pod struct {
+			Name      string `json:"name"`
+			Namespace string `json:"namespace"`
+			Status    string `json:"status"`
+		}
+		var podList []Pod
+		for _, pod := range pods.Items {
+			podItem := Pod{
+				Name:      pod.GetName(),
+				Namespace: pod.Namespace,
+				Status:    string(pod.Status.Phase),
+			}
+			fmt.Println("XXX", podItem)
+			podList = append(podList, podItem)
+		}
+
+		jsonResp, err := json.Marshal(podList)
 		if err != nil {
 			log.Fatalf("Error happened in JSON marshal. Err: %s", err)
 		}
+		fmt.Println("YYY", string(jsonResp))
 		// 	messageType, p, err := conn.ReadMessage()
 		// 	if err != nil {
 		// 		log.Println(err)
