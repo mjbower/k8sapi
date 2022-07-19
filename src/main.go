@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -17,8 +16,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 )
@@ -109,48 +111,175 @@ func getNamespaces(w http.ResponseWriter, r *http.Request) {
 
 func reader(conn *websocket.Conn) {
 	log.Println("Opened Websocket to send pod data")
-	for {
-		// get pods in all the namespaces by omitting namespace
-		// Or specify namespace to get pods in particular namespace
-		pods, err := cs.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			panic(err.Error())
-		}
-		fmt.Printf("There are %d pods in the cluster\n", len(pods.Items))
 
-		var podList []Pod
-		for _, pod := range pods.Items {
-			podItem := Pod{
-				Name:      pod.GetName(),
-				Namespace: pod.Namespace,
-				Status:    string(pod.Status.Phase),
-				Action:    "haha,,fix this",
-			}
-			fmt.Println("XXX", podItem)
-			podList = append(podList, podItem)
-		}
+	// stop signal for the informer
+	stopper := make(chan struct{})
+	defer close(stopper)
 
-		jsonResp, err := json.Marshal(podList)
-		if err != nil {
-			log.Fatalf("Error happened in JSON marshal. Err: %s", err)
-		}
-		fmt.Println("YYY", string(jsonResp))
-		// 	messageType, p, err := conn.ReadMessage()
-		// 	if err != nil {
-		// 		log.Println(err)
-		// 		return
-		// 	}
-		// 	log.Println("Received MSG :", string(p))
-		messageType := 1
-		if err := conn.WriteMessage(messageType, jsonResp); err != nil {
-			log.Println(err)
-			return
-		}
+	factory := informers.NewSharedInformerFactory(cs, 0)
+	podInformer := factory.Core().V1().Pods()
+	informer := podInformer.Informer()
 
-		time.Sleep(5 * time.Second)
+	defer runtime.HandleCrash()
+
+	// start informer ->
+	go factory.Start(stopper)
+
+	// start to sync and call list
+	if !cache.WaitForCacheSync(stopper, informer.HasSynced) {
+		runtime.HandleError(fmt.Errorf("Timed out waiting for caches to sync"))
+		return
 	}
 
+	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) { // register add Handler
+			mObj, ok := obj.(*corev1.Pod)
+			if !ok {
+				log.Panic("Not a Pod added")
+			}
+			pStatus := getPodStatus(mObj)
 
+			json := createJson("add",mObj.Name,mObj.Namespace,pStatus)
+			messageType := 1
+			if err := conn.WriteMessage(messageType, json); err != nil {
+				log.Println(err)
+				return
+			}
+		},  		
+		UpdateFunc: func(oldObj interface{}, newObj interface{}) { // register update Handler
+			oObj, ok := oldObj.(*corev1.Pod)
+			nObj, ok := newObj.(*corev1.Pod)
+			if !ok {
+				log.Panic("Not a Pod added")
+			}
+		
+			// if we get a pod Running, but with 0/1 , we don't detect that.
+			
+			var pStatus string
+			pStatus = getPodStatus(oObj)
+			//fmt.Printf("ZZ OLD Status Pod(%s) namespace(%s) Status(%s)\n",oObj.Name,oObj.Namespace,pStatus)
+			pStatus = getPodStatus(nObj)
+			json := createJson("add",nObj.Name,nObj.Namespace,pStatus) 
+			messageType := 1
+			if err := conn.WriteMessage(messageType, json); err != nil {
+				log.Println(err)
+				return
+			}
+		}, 	
+		DeleteFunc: func(obj interface{}) { // register delete Handler
+			mObj, ok := obj.(*corev1.Pod)
+			if !ok {
+				log.Panic("Not a Pod added")
+			}
+		
+			json := createJson("delete",mObj.Name,mObj.Namespace,"deleted")
+			messageType := 1
+			if err := conn.WriteMessage(messageType, json); err != nil {
+				log.Println(err)
+				return
+			}
+		},	
+	})
+
+	<-stopper
+
+
+	// for {
+	// 	// get pods in all the namespaces by omitting namespace
+	// 	// Or specify namespace to get pods in particular namespace
+	// 	pods, err := cs.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+	// 	if err != nil {
+	// 		panic(err.Error())
+	// 	}
+	// 	fmt.Printf("There are %d pods in the cluster\n", len(pods.Items))
+
+	// 	var podList []Pod
+	// 	for _, pod := range pods.Items {
+	// 		podItem := Pod{
+	// 			Name:      pod.GetName(),
+	// 			Namespace: pod.Namespace,
+	// 			Status:    string(pod.Status.Phase),
+	// 			Action:    "haha,,fix this",
+	// 		}
+	// 		fmt.Println("XXX", podItem)
+	// 		podList = append(podList, podItem)
+	// 	}
+
+	// 	jsonResp, err := json.Marshal(podList)
+	// 	if err != nil {
+	// 		log.Fatalf("Error happened in JSON marshal. Err: %s", err)
+	// 	}
+	// 	fmt.Println("YYY", string(jsonResp))
+	// 	// 	messageType, p, err := conn.ReadMessage()
+	// 	// 	if err != nil {
+	// 	// 		log.Println(err)
+	// 	// 		return
+	// 	// 	}
+	// 	// 	log.Println("Received MSG :", string(p))
+	// 	messageType := 1
+	// 	if err := conn.WriteMessage(messageType, jsonResp); err != nil {
+	// 		log.Println(err)
+	// 		return
+	// 	}
+
+	// 	time.Sleep(5 * time.Second)
+	// }
+}
+
+func onAdd(obj interface{}) {
+	mObj, ok := obj.(*corev1.Pod)
+	if !ok {
+		log.Panic("Not a Pod added")
+	}
+	pStatus := getPodStatus(mObj)
+
+	json := createJson("add",mObj.Name,mObj.Namespace,pStatus)
+	_ = json	// SEND WEBSOCKET
+}
+
+func onUpdate(oldObj interface{},newObj interface{}) {
+	oObj, ok := oldObj.(*corev1.Pod)
+	nObj, ok := newObj.(*corev1.Pod)
+	if !ok {
+		log.Panic("Not a Pod added")
+	}
+
+	// if we get a pod Running, but with 0/1 , we don't detect that.
+	
+	// fmt.Printf("Old Pod Updated Name(%s) Phase(%s) Status(%v)\n",oObj.Name,oObj.Status.Phase,oObj.Status.ContainerStatuses)
+	// fmt.Printf("New Pod Updated Name(%s) Phase(%s) \n",nObj.Name,nObj.Status.Phase)
+	var pStatus string
+	pStatus = getPodStatus(oObj)
+	//fmt.Printf("ZZ OLD Status Pod(%s) namespace(%s) Status(%s)\n",oObj.Name,oObj.Namespace,pStatus)
+	pStatus = getPodStatus(nObj)
+	json := createJson("add",nObj.Name,nObj.Namespace,pStatus)
+	_ = json	// SEND WEBSOCKET
+	//fmt.Printf("ZZ NEW Status Pod(%s) namespace(%s) Status(%s)\n",nObj.Name,nObj.Namespace,pStatus)
+}
+
+func onDelete(obj interface{}) {
+	mObj, ok := obj.(*corev1.Pod)
+	if !ok {
+		log.Panic("Not a Pod added")
+	}
+
+	json := createJson("delete",mObj.Name,mObj.Namespace,"deleted")
+	_ = json	// SEND WEBSOCKET
+}
+
+func createJson(action,name,ns,status string) []byte{
+	newPod := Pod{ 
+		Action: action,
+		Name: name, 
+		Namespace: ns,
+		Status: status, 
+	}
+	jsonMsg, err := json.Marshal(newPod)
+	if err != nil {
+		log.Fatalf("Error happened in JSON marshal. Err: %s", err)
+	}
+	fmt.Printf("\tSent %s\n",jsonMsg)
+	return jsonMsg
 }
 
 /*
