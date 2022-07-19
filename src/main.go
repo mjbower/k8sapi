@@ -35,7 +35,7 @@ var upgrader = websocket.Upgrader{
 }
 
 type Namespace struct {
-	Name      string `json:"name"`
+	Name   string `json:"name"`
 	Action string `json:"action"`
 }
 
@@ -43,7 +43,7 @@ type Pod struct {
 	Name      string `json:"name"`
 	Namespace string `json:"namespace"`
 	Status    string `json:"status"`
-	Action string `json:"action"`
+	Action    string `json:"action"`
 }
 
 func check(e error) {
@@ -94,7 +94,7 @@ func getNamespaces(w http.ResponseWriter, r *http.Request) {
 	var nsList []Namespace
 	for _, ns := range nameSpaces.Items {
 		nsItem := Namespace{
-			Name: ns.Name ,
+			Name:   ns.Name,
 			Action: "add",
 		}
 		nsList = append(nsList, nsItem)
@@ -147,38 +147,37 @@ func reader(conn *websocket.Conn) {
 			}
 			pStatus := getPodStatus(mObj)
 
-			json := createJson("add",mObj.Name,mObj.Namespace,pStatus)
-			send_WS(conn,json)
-		},  		
+			json := createJson("add", mObj.Name, mObj.Namespace, pStatus)
+			send_WS(conn, json)
+		},
 		UpdateFunc: func(oldObj interface{}, newObj interface{}) { // register update Handler
 			oObj, ok := oldObj.(*corev1.Pod)
 			nObj, ok := newObj.(*corev1.Pod)
 			if !ok {
 				log.Panic("Not a Pod added")
 			}
-		
+
 			// if we get a pod Running, but with 0/1 , we don't detect that.
-			
+
 			var pStatus string
 			pStatus = getPodStatus(oObj)
 			//fmt.Printf("ZZ OLD Status Pod(%s) namespace(%s) Status(%s)\n",oObj.Name,oObj.Namespace,pStatus)
 			pStatus = getPodStatus(nObj)
-			json := createJson("add",nObj.Name,nObj.Namespace,pStatus) 
-			send_WS(conn,json)
-		}, 	
+			json := createJson("add", nObj.Name, nObj.Namespace, pStatus)
+			send_WS(conn, json)
+		},
 		DeleteFunc: func(obj interface{}) { // register delete Handler
 			mObj, ok := obj.(*corev1.Pod)
 			if !ok {
 				log.Panic("Not a Pod added")
 			}
-		
-			json := createJson("delete",mObj.Name,mObj.Namespace,"deleted")
-			send_WS(conn,json)
-		},	
+
+			json := createJson("delete", mObj.Name, mObj.Namespace, "deleted")
+			send_WS(conn, json)
+		},
 	})
 
 	<-stopper
-
 
 	// for {
 	// 	// get pods in all the namespaces by omitting namespace
@@ -229,11 +228,11 @@ func onAdd(obj interface{}) {
 	}
 	pStatus := getPodStatus(mObj)
 
-	json := createJson("add",mObj.Name,mObj.Namespace,pStatus)
-	_ = json	// SEND WEBSOCKET
+	json := createJson("add", mObj.Name, mObj.Namespace, pStatus)
+	_ = json // SEND WEBSOCKET
 }
 
-func onUpdate(oldObj interface{},newObj interface{}) {
+func onUpdate(oldObj interface{}, newObj interface{}) {
 	oObj, ok := oldObj.(*corev1.Pod)
 	nObj, ok := newObj.(*corev1.Pod)
 	if !ok {
@@ -241,15 +240,15 @@ func onUpdate(oldObj interface{},newObj interface{}) {
 	}
 
 	// if we get a pod Running, but with 0/1 , we don't detect that.
-	
+
 	// fmt.Printf("Old Pod Updated Name(%s) Phase(%s) Status(%v)\n",oObj.Name,oObj.Status.Phase,oObj.Status.ContainerStatuses)
 	// fmt.Printf("New Pod Updated Name(%s) Phase(%s) \n",nObj.Name,nObj.Status.Phase)
 	var pStatus string
 	pStatus = getPodStatus(oObj)
 	//fmt.Printf("ZZ OLD Status Pod(%s) namespace(%s) Status(%s)\n",oObj.Name,oObj.Namespace,pStatus)
 	pStatus = getPodStatus(nObj)
-	json := createJson("add",nObj.Name,nObj.Namespace,pStatus)
-	_ = json	// SEND WEBSOCKET
+	json := createJson("add", nObj.Name, nObj.Namespace, pStatus)
+	_ = json // SEND WEBSOCKET
 	//fmt.Printf("ZZ NEW Status Pod(%s) namespace(%s) Status(%s)\n",nObj.Name,nObj.Namespace,pStatus)
 }
 
@@ -259,22 +258,22 @@ func onDelete(obj interface{}) {
 		log.Panic("Not a Pod added")
 	}
 
-	json := createJson("delete",mObj.Name,mObj.Namespace,"deleted")
-	_ = json	// SEND WEBSOCKET
+	json := createJson("delete", mObj.Name, mObj.Namespace, "deleted")
+	_ = json // SEND WEBSOCKET
 }
 
-func createJson(action,name,ns,status string) []byte{
-	newPod := Pod{ 
-		Action: action,
-		Name: name, 
+func createJson(action, name, ns, status string) []byte {
+	newPod := Pod{
+		Action:    action,
+		Name:      name,
 		Namespace: ns,
-		Status: status, 
+		Status:    status,
 	}
 	jsonMsg, err := json.Marshal(newPod)
 	if err != nil {
 		log.Fatalf("Error happened in JSON marshal. Err: %s", err)
 	}
-	fmt.Printf("\tSent %s\n",jsonMsg)
+	fmt.Printf("\tSent %s\n", jsonMsg)
 	return jsonMsg
 }
 
@@ -309,10 +308,10 @@ func getPods(w http.ResponseWriter, r *http.Request) {
 	var podList []Pod
 	for _, pod := range pods.Items {
 		podItem := Pod{
-			Name: pod.Name ,
-			Namespace: pod.Namespace ,
-			Status: getPodStatus(&pod),
-			Action: "add",
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+			Status:    getPodStatus(&pod),
+			Action:    "add",
 		}
 		podList = append(podList, podItem)
 	}
@@ -320,98 +319,97 @@ func getPods(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatalf("Error happened in JSON marshal. Err: %s", err)
 	}
-	
+
 	w.WriteHeader(http.StatusCreated)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(jsonResp)
 }
 
-func getPodStatus(pod *corev1.Pod) string{
+func getPodStatus(pod *corev1.Pod) string {
 	restarts := 0
-		//totalContainers := len(pod.Spec.Containers)
-		readyContainers := 0
+	//totalContainers := len(pod.Spec.Containers)
+	readyContainers := 0
 
-		
-		reason := string(pod.Status.Phase)
-		if pod.Status.Reason != "" {
-			reason = pod.Status.Reason
+	reason := string(pod.Status.Phase)
+	if pod.Status.Reason != "" {
+		reason = pod.Status.Reason
+	}
+	//fmt.Printf("XX %s - Pod (start) Name(%s) REASON %s\n",someText, pod.Name,reason)
+
+	// switch pod.Status.Phase {
+	// case corev1.PodSucceeded:
+	// 	fmt.Printf("XXXX Pod Succeeded %s\n",corev1.podSuccessConditions)
+	// case corev1.PodFailed:
+	// 	fmt.Printf("XXXX Pod Failed %s\n",corev1.podFailedConditions)
+	// }
+
+	initializing := false
+	for i := range pod.Status.InitContainerStatuses {
+		container := pod.Status.InitContainerStatuses[i]
+		restarts += int(container.RestartCount)
+		switch {
+		case container.State.Terminated != nil && container.State.Terminated.ExitCode == 0:
+			continue
+		case container.State.Terminated != nil:
+			// initialization is failed
+			if len(container.State.Terminated.Reason) == 0 {
+				if container.State.Terminated.Signal != 0 {
+					reason = fmt.Sprintf("XX Init:Signal:%d", container.State.Terminated.Signal)
+				} else {
+					reason = fmt.Sprintf("XX Init:ExitCode:%d", container.State.Terminated.ExitCode)
+				}
+			} else {
+				reason = "XX Init:" + container.State.Terminated.Reason
+			}
+			initializing = true
+		case container.State.Waiting != nil && len(container.State.Waiting.Reason) > 0 && container.State.Waiting.Reason != "PodInitializing":
+			reason = "XX Init:" + container.State.Waiting.Reason
+			initializing = true
+		default:
+			reason = fmt.Sprintf("XX Init:%d/%d\n", i, len(pod.Spec.InitContainers))
+			initializing = true
 		}
-		//fmt.Printf("XX %s - Pod (start) Name(%s) REASON %s\n",someText, pod.Name,reason)
+		break
+	}
+	if !initializing {
+		restarts = 0
+		hasRunning := false
+		for i := len(pod.Status.ContainerStatuses) - 1; i >= 0; i-- {
+			container := pod.Status.ContainerStatuses[i]
 
-		// switch pod.Status.Phase {
-		// case corev1.PodSucceeded:
-		// 	fmt.Printf("XXXX Pod Succeeded %s\n",corev1.podSuccessConditions)
-		// case corev1.PodFailed:
-		// 	fmt.Printf("XXXX Pod Failed %s\n",corev1.podFailedConditions)
-		// }
-
-		initializing := false
-		for i := range pod.Status.InitContainerStatuses {
-			container := pod.Status.InitContainerStatuses[i]
 			restarts += int(container.RestartCount)
-			switch {
-			case container.State.Terminated != nil && container.State.Terminated.ExitCode == 0:
-				continue
-			case container.State.Terminated != nil:
-				// initialization is failed
-				if len(container.State.Terminated.Reason) == 0 {
-					if container.State.Terminated.Signal != 0 {
-						reason = fmt.Sprintf("XX Init:Signal:%d", container.State.Terminated.Signal)
-					} else {
-						reason = fmt.Sprintf("XX Init:ExitCode:%d", container.State.Terminated.ExitCode)
-					}
+			if container.State.Waiting != nil && container.State.Waiting.Reason != "" {
+				reason = container.State.Waiting.Reason
+			} else if container.State.Terminated != nil && container.State.Terminated.Reason != "" {
+				reason = container.State.Terminated.Reason
+			} else if container.State.Terminated != nil && container.State.Terminated.Reason == "" {
+				if container.State.Terminated.Signal != 0 {
+					reason = fmt.Sprintf("XX Signal:%d\n", container.State.Terminated.Signal)
 				} else {
-					reason = "XX Init:" + container.State.Terminated.Reason
+					reason = fmt.Sprintf("XX ExitCode:%d\n", container.State.Terminated.ExitCode)
 				}
-				initializing = true
-			case container.State.Waiting != nil && len(container.State.Waiting.Reason) > 0 && container.State.Waiting.Reason != "PodInitializing":
-				reason = "XX Init:" + container.State.Waiting.Reason
-				initializing = true
-			default:
-				reason = fmt.Sprintf("XX Init:%d/%d\n", i, len(pod.Spec.InitContainers))
-				initializing = true
-			}
-			break
-		}
-		if !initializing {
-			restarts = 0
-			hasRunning := false
-			for i := len(pod.Status.ContainerStatuses) - 1; i >= 0; i-- {
-				container := pod.Status.ContainerStatuses[i]
-
-				restarts += int(container.RestartCount)
-				if container.State.Waiting != nil && container.State.Waiting.Reason != "" {
-					reason = container.State.Waiting.Reason
-				} else if container.State.Terminated != nil && container.State.Terminated.Reason != "" {
-					reason = container.State.Terminated.Reason
-				} else if container.State.Terminated != nil && container.State.Terminated.Reason == "" {
-					if container.State.Terminated.Signal != 0 {
-						reason = fmt.Sprintf("XX Signal:%d\n", container.State.Terminated.Signal)
-					} else {
-						reason = fmt.Sprintf("XX ExitCode:%d\n", container.State.Terminated.ExitCode)
-					}
-				} else if container.Ready && container.State.Running != nil {
-					hasRunning = true
-					readyContainers++
-				}
-			}
-
-			// change pod status back to "Running" if there is at least one container still reporting as "Running" status
-			if reason == "Completed" && hasRunning {
-				if hasPodReadyCondition(pod.Status.Conditions) {
-					reason = "Running"
-				} else {
-					reason = "NotReady"
-				}
+			} else if container.Ready && container.State.Running != nil {
+				hasRunning = true
+				readyContainers++
 			}
 		}
 
-		if pod.DeletionTimestamp != nil {
-			reason = "Terminating"
+		// change pod status back to "Running" if there is at least one container still reporting as "Running" status
+		if reason == "Completed" && hasRunning {
+			if hasPodReadyCondition(pod.Status.Conditions) {
+				reason = "Running"
+			} else {
+				reason = "NotReady"
+			}
 		}
-		// SEND ME to WEBSOCKET
-		//fmt.Printf("XX %s - Final (finish) Name(%s) REASON %s\n",someText,pod.Name,reason)
-		return reason
+	}
+
+	if pod.DeletionTimestamp != nil {
+		reason = "Terminating"
+	}
+	// SEND ME to WEBSOCKET
+	//fmt.Printf("XX %s - Final (finish) Name(%s) REASON %s\n",someText,pod.Name,reason)
+	return reason
 }
 
 func hasPodReadyCondition(conditions []corev1.PodCondition) bool {
