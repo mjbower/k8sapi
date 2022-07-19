@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -30,6 +29,11 @@ var localMode bool
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
+}
+
+type Namespace struct {
+	Name      string `json:"name"`
+	Action string `json:"action"`
 }
 
 func check(e error) {
@@ -77,32 +81,25 @@ func getNamespaces(w http.ResponseWriter, r *http.Request) {
 		panic(err.Error())
 	}
 	fmt.Printf("There are %d Namespaces in the cluster\n", len(nameSpaces.Items))
-
-	w.WriteHeader(http.StatusCreated)
-	w.Header().Set("Content-Type", "application/json")
-
-	jsonResp, err := json.Marshal(nameSpaces)
+	var nsList []Namespace
+	for _, ns := range nameSpaces.Items {
+		nsItem := Namespace{
+			Name: ns.Name ,
+			Action: "add",
+		}
+		nsList = append(nsList, nsItem)
+	}
+	jsonResp, err := json.Marshal(nsList)
 	if err != nil {
 		log.Fatalf("Error happened in JSON marshal. Err: %s", err)
 	}
+
+	w.WriteHeader(http.StatusCreated)
+	w.Header().Set("Content-Type", "application/json")
 	w.Write(jsonResp)
 }
 
 func reader(conn *websocket.Conn) {
-	wsTimer := 10
-	websocketloop, ok := os.LookupEnv("WEBSOCKETLOOP")
-
-	if ok {
-		var err error
-		wsTimer, err = strconv.Atoi(websocketloop)
-
-		if err != nil {
-			// ... handle error
-			panic(err)
-		}
-	}
-	fmt.Println("Websocket loop time set to ", wsTimer)
-
 	log.Println("Opened Websocket to send pod data")
 	for {
 		// get pods in all the namespaces by omitting namespace
@@ -148,6 +145,8 @@ func reader(conn *websocket.Conn) {
 
 		time.Sleep(5 * time.Second)
 	}
+
+
 }
 
 /*
@@ -161,7 +160,7 @@ func wsGetPods(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error happened.  Err: %s/n", err)
 	}
 
-	fmt.Fprintf(w, "websocket opened for namespace %v\n", ws)
+	fmt.Printf("Websocket opened to send pod data\n")
 	reader(ws)
 }
 
