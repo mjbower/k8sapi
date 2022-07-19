@@ -109,6 +109,14 @@ func getNamespaces(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonResp)
 }
 
+func send_WS(conn *websocket.Conn, json []byte) {
+	messageType := 1
+	if err := conn.WriteMessage(messageType, json); err != nil {
+		log.Println(err)
+		return
+	}
+}
+
 func reader(conn *websocket.Conn) {
 	log.Println("Opened Websocket to send pod data")
 
@@ -140,11 +148,7 @@ func reader(conn *websocket.Conn) {
 			pStatus := getPodStatus(mObj)
 
 			json := createJson("add",mObj.Name,mObj.Namespace,pStatus)
-			messageType := 1
-			if err := conn.WriteMessage(messageType, json); err != nil {
-				log.Println(err)
-				return
-			}
+			send_WS(conn,json)
 		},  		
 		UpdateFunc: func(oldObj interface{}, newObj interface{}) { // register update Handler
 			oObj, ok := oldObj.(*corev1.Pod)
@@ -160,11 +164,7 @@ func reader(conn *websocket.Conn) {
 			//fmt.Printf("ZZ OLD Status Pod(%s) namespace(%s) Status(%s)\n",oObj.Name,oObj.Namespace,pStatus)
 			pStatus = getPodStatus(nObj)
 			json := createJson("add",nObj.Name,nObj.Namespace,pStatus) 
-			messageType := 1
-			if err := conn.WriteMessage(messageType, json); err != nil {
-				log.Println(err)
-				return
-			}
+			send_WS(conn,json)
 		}, 	
 		DeleteFunc: func(obj interface{}) { // register delete Handler
 			mObj, ok := obj.(*corev1.Pod)
@@ -173,11 +173,7 @@ func reader(conn *websocket.Conn) {
 			}
 		
 			json := createJson("delete",mObj.Name,mObj.Namespace,"deleted")
-			messageType := 1
-			if err := conn.WriteMessage(messageType, json); err != nil {
-				log.Println(err)
-				return
-			}
+			send_WS(conn,json)
 		},	
 	})
 
