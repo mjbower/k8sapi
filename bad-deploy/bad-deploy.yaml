@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: bad-deploy
+  name: bad-deploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bad-deploy
+  template:
+    metadata:
+      labels:
+        app: bad-deploy
+    spec:
+      containers:
+      - image: nginx
+        name: bad-deploy
+        livenessProbe:
+          httpGet:
+            path: /badendpoint
+            port: 8084
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /badendpoint
+            port: 8084
+          initialDelaySeconds: 5
+          periodSeconds: 3
