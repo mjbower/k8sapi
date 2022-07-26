@@ -46,12 +46,6 @@ type Pod struct {
 	Action    string `json:"action"`
 }
 
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
-}
-
 /*
 Create a connection to the cluster, use -l flag for local connection
 */
